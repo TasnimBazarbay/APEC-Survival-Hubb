@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | APEC Radar</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div id="toast-container"></div>
+    <div class="container admin-container">
+        
+        <header style="position: relative; margin-bottom: 30px;">
+            <button id="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                <svg class="moon-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                <svg class="sun-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </button>
+            <h2>Центр Управления APEC</h2>
+            <p style="text-align: center;">Система мониторинга инфраструктуры (Live 🟢)</p>
+        </header>
+        
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+                <div class="stat-info"><h3 id="stat-today">0</h3><p>Заявок сегодня</p></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                <div class="stat-info"><h3 id="stat-progress">0</h3><p>В работе</p></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                <div class="stat-info"><h3 id="stat-critical">0</h3><p>Критические (Активные)</p></div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="searchInput" placeholder="Поиск по кабинету или описанию..." oninput="applyFilters()">
+            </div>
+            <select id="categoryFilter" onchange="applyFilters()">
+                <option value="all">Все категории</option>
+                <option value="Электрика">Электрика</option>
+                <option value="Сантехника">Сантехника</option>
+                <option value="Мебель">Мебель / Интерьер</option>
+                <option value="IT">IT-оборудование</option>
+                <option value="Климат">Кондиционирование</option>
+            </select>
+        </div>
+
+        <div id="ticketList" class="ticket-grid"></div>
+        <a href="/logout" class="logout-link">Выйти из панели управления</a>
+    </div>
+
+    <script>
+        // Инициализация Firebase с твоей БД
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6joyWuIT9M44dbX_i1jbmM-nFMGUwK4w",
+            authDomain: "apecsurvivalhub.firebaseapp.com",
+            databaseURL: "https://apecsurvivalhub-default-rtdb.firebaseio.com",
+            projectId: "apecsurvivalhub",
+            storageBucket: "apecsurvivalhub.firebasestorage.app",
+            messagingSenderId: "528195180456",
+            appId: "1:528195180456:web:c73ea9aa6e22a0251eaf9d"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let allTickets = [];
+
+        // --- Управление Темой ---
+        function initTheme() {
+            if (localStorage.getItem('apec-theme') === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                document.querySelector('.moon-icon').style.display = 'none';
+                document.querySelector('.sun-icon').style.display = 'block';
+            }
+        }
+        function toggleTheme() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.body.removeAttribute('data-theme'); localStorage.setItem('apec-theme', 'light');
+                document.querySelector('.moon-icon').style.display = 'block'; document.querySelector('.sun-icon').style.display = 'none';
+            } else {
+                document.body.setAttribute('data-theme', 'dark'); localStorage.setItem('apec-theme', 'dark');
+                document.querySelector('.moon-icon').style.display = 'none'; document.querySelector('.sun-icon').style.display = 'block';
+            }
+        }
+        initTheme();
+
+        function showToast(message) {
+            let c = document.getElementById('toast-container');
+            if (!c) { c = document.createElement('div'); c.id = 'toast-container'; document.body.appendChild(c); }
+            const t = document.createElement('div'); t.className = 'toast'; t.innerText = message;
+            c.appendChild(t); setTimeout(() => { t.remove(); }, 4000);
+        }
+
+        // --- МАГИЯ REAL-TIME (УМНЫЙ СЛУШАТЕЛЬ) ---
+        db.ref('tickets').on('value', (snapshot) => {
+            allTickets = [];
+            snapshot.forEach((childSnapshot) => {
+                allTickets.push({
+                    id: childSnapshot.key,
+                    ...childSnapshot.val()
+                });
+            });
+            runSmartAnalysisAndRender(); // Пересчитываем статистику и рисуем при ЛЮБОМ изменении
+        });
+
+        function runSmartAnalysisAndRender() {
+            const critical_keywords = ['искрит', 'замыкание', 'вода', 'потоп', 'прорыв', 'дым', 'пожар', 'срочно'];
+            let todayCount = 0, progressCount = 0, criticalCount = 0;
+            const todayStr = new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+            allTickets.forEach(t => {
+                const desc = (t.description || '').toLowerCase();
+                t.priority = critical_keywords.some(kw => desc.includes(kw)) ? 'High' : 'Normal';
+
+                if (t.date && t.date.includes(todayStr)) todayCount++;
+                if (t.status === 'in_progress') progressCount++;
+                if (t.priority === 'High' && t.status !== 'resolved') criticalCount++;
+            });
+
+            document.getElementById('stat-today').innerText = todayCount;
+            document.getElementById('stat-progress').innerText = progressCount;
+            document.getElementById('stat-critical').innerText = criticalCount;
+
+            // Умная сортировка: Сначала нерешенные -> Критические -> Новые
+            allTickets.sort((a, b) => {
+                if (a.status === 'resolved' && b.status !== 'resolved') return 1;
+                if (a.status !== 'resolved' && b.status === 'resolved') return -1;
+                if (a.priority === 'High' && b.priority !== 'High') return -1;
+                if (a.priority !== 'High' && b.priority === 'High') return 1;
+                const timeA = a.timestamp || 0;
+                const timeB = b.timestamp || 0;
+                return timeB - timeA; 
+            });
+
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+            
+            const filteredTickets = allTickets.filter(t => {
+                const matchesSearch = (t.room || '').toLowerCase().includes(searchText) || (t.description || '').toLowerCase().includes(searchText);
+                const matchesCategory = (category === 'all') || (t.category === category);
+                return matchesSearch && matchesCategory;
+            });
+            renderTickets(filteredTickets);
+        }
+
+        function renderTickets(ticketsToRender) {
+            const list = document.getElementById('ticketList');
+            list.innerHTML = '';
+            
+            if (ticketsToRender.length === 0) {
+                list.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Заявок пока нет.</div>`;
+                return;
+            }
+
+            ticketsToRender.forEach((t, index) => {
+                const isHigh = t.priority === 'High';
+                const statusClass = t.status !== 'pending' ? `status-${t.status}` : '';
+                const alertIcon = isHigh ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>` : '';
+                
+                list.innerHTML += `
+                    <div class="ticket-card fade-in ${isHigh && t.status !== 'resolved' ? 'priority-high' : ''} ${statusClass}" style="animation-delay: ${index * 0.03}s">
+                        <div class="card-header">
+                            <span class="room" style="display: inline-flex; align-items: center;">
+                                ${alertIcon} Каб: ${t.room}
+                            </span>
+                            <span class="date">${t.date}</span>
+                        </div>
+                        <div class="category">${t.category}</div>
+                        <p class="desc">${t.description}</p>
+                        <div class="footer">Отправитель: ${t.student}</div>
+                        
+                        <div class="status-actions">
+                            <button onclick="changeStatus('${t.id}', 'in_progress')" class="status-btn btn-work">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> В работу
+                            </button>
+                            <button onclick="changeStatus('${t.id}', 'resolved')" class="status-btn btn-resolve">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Решено
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function changeStatus(id, newStatus) {
+            try {
+                // Изменяем статус в Realtime Database
+                await db.ref('tickets/' + id).update({ status: newStatus });
+            } catch (error) {
+                showToast("Ошибка обновления: " + error.message);
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

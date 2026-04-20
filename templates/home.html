@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APEC Radar | Создать заявку</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div id="toast-container"></div>
+    
+    <div class="container">
+        <header>
+            <h1>APEC Radar</h1>
+            <p style="text-align: center; margin-bottom: 25px;">Студент: <strong>{{ user.email.split('@')[0] }}</strong></p>
+        </header>
+        
+        <form id="ticketForm">
+            <input type="text" name="room" placeholder="Номер аудитории (например, 302)" required>
+            
+            <select name="category" required>
+                <option value="" disabled selected>Выберите категорию проблемы...</option>
+                <option value="Электрика">⚡ Электрика (Свет, розетки)</option>
+                <option value="Мебель">🪑 Мебель / Интерьер</option>
+                <option value="IT">💻 IT-оборудование (ПК, проектор)</option>
+                <option value="Сантехника">💧 Сантехника</option>
+                <option value="Климат">❄️ Кондиционирование</option>
+            </select>
+            
+            <textarea name="description" placeholder="Детально опишите проблему (например, искрит розетка возле окна)..." required></textarea>
+            
+            <button type="submit" id="submitBtn">ОТПРАВИТЬ ЗАЯВКУ</button>
+        </form>
+        <a href="/logout" class="logout-link">Завершить сеанс</a>
+    </div>
+
+    <script>
+        // Инициализация Firebase (с добавленной ссылкой на твою БД)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6joyWuIT9M44dbX_i1jbmM-nFMGUwK4w",
+            authDomain: "apecsurvivalhub.firebaseapp.com",
+            databaseURL: "https://apecsurvivalhub-default-rtdb.firebaseio.com",
+            projectId: "apecsurvivalhub",
+            storageBucket: "apecsurvivalhub.firebasestorage.app",
+            messagingSenderId: "528195180456",
+            appId: "1:528195180456:web:c73ea9aa6e22a0251eaf9d"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function showToast(message) {
+            let container = document.getElementById('toast-container');
+            if (!container) { container = document.createElement('div'); container.id = 'toast-container'; document.body.appendChild(container); }
+            const toast = document.createElement('div'); toast.className = 'toast'; toast.innerText = message;
+            container.appendChild(toast); setTimeout(() => { toast.remove(); }, 4000);
+        }
+
+        document.getElementById('ticketForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "ОТПРАВКА В ОБЛАКО...";
+            btn.style.opacity = "0.7";
+            btn.disabled = true;
+            
+            try {
+                const formData = new FormData(e.target);
+                // Пушим данные в Realtime Database
+                const newTicketRef = db.ref('tickets').push();
+                await newTicketRef.set({
+                    room: formData.get('room'),
+                    category: formData.get('category'),
+                    description: formData.get('description'),
+                    student: "{{ user.email }}",
+                    status: "pending",
+                    date: new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                showToast("Заявка успешно отправлена!");
+                e.target.reset();
+            } catch (error) {
+                showToast("Ошибка при отправке: " + error.message);
+                console.error(error);
+            } finally {
+                btn.innerText = originalText;
+                btn.style.opacity = "1";
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
